@@ -1,0 +1,23 @@
+monome-firmware
+
+2010. monome. brian crabtree. tehn@monome.org
+
+http://monome.org
+
+====================================================================
+
+firmwares licensed cc by-nc-na:
+	http://creativecommons.org/licenses/by-nc-sa/3.0/
+
+most of these files are for non-commercial use-- please contact us
+directly with questions or discussion. we're reasonable people.
+
+please share any modifications you make! the community grows
+stronger with your participation.
+
+====================================================================
+
+
+gs64-rec10	for devices using rec10 pcb, serials 600-799
+gs64-rec11	for devices using rec11 pcb, serials 800-
+gs128		for all gs128 
