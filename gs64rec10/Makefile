@@ -48,7 +48,7 @@ fuses:
 	avarice -2 --write-fuses ff99ff --jtag usb --jtag-bitrate 500KHz
 
 pro: $(TARGET).hex
-	avrdude -p m325 -b 115200 -P usb -c avrispmkII -e -D -U flash:w:$(TARGET).hex:i -U lfuse:w:0xff:m
+	avrdude -p m325 -b 115200 -P usb -c avrispmkII -e -D -U flash:w:$(TARGET).hex:i -U lfuse:w:0xff:m -U hfuse:w:0x99:m -U efuse:w:0xff:m
 	#avarice --erase --program --file $(TARGET).hex --jtag /dev/tty.usbserial-1B1 --jtag-bitrate 500KHz --write-fuses fc89ef
 
 qpro: $(TARGET).hex

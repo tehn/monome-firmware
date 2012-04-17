@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include "button.h"
 
+
 static const uint8 rev[] =
 {
 0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0, 0x10, 0x90, 0x50, 0xD0, 0x30, 0xB0, 0x70, 0xF0,
@@ -64,6 +65,9 @@ static const uint8 rev[] =
 #define C4_PWREN 0x10
 
 
+char input_check;
+
+
 void to_led(char data_all, char data1)
 {
 	uint8 i;
@@ -96,6 +100,14 @@ void to_led(char data_all, char data1)
 }
 
 
+ISR(TIMER0_COMP_vect)
+{
+	input_check = 1;
+	TCNT0 = 0;
+}
+
+
+
 int main(void)
 {
 	uint8 i1,i2,i3,i4;
@@ -119,6 +131,7 @@ int main(void)
 	uint8 display[4][8];
 	
 	uint8 packet_length[14];
+	
 	
 
 	// setup packet length
@@ -214,6 +227,12 @@ int main(void)
 	tilt_accum[0] = tilt_accum[1] = 1016; // 127 * 8
 	tilt_axis = 0;
 	tilt_index = 0;
+	
+	
+	TCCR0A |= (1<<CS02) | (1<<CS00); // timer0 on, prescale clk/1024 (p95)
+	TIMSK0 |= (1 << OCIE0A);// | (1<< TOIE0);  // enable timer0 interrupts
+	OCR0A = 25;
+	sei();
 
 	while(true) {
 		// ========================== ASLEEP:
@@ -386,102 +405,105 @@ int main(void)
 
 			// ====================== check/send keypad data
 			
-			
-			PORTD = 0;                      // setup PORTD for output
-			DDRD = 0xFF;
+			if(input_check)
+			{
+				PORTD = 0;                      // setup PORTD for output
+				DDRD = 0xFF;
 
 
-			for(i1=0;i1<8;i1++) {
+				for(i1=0;i1<8;i1++) {
 				
-				// sel row
-				i2 = i1 << 4;				// to prevent momentary flicker to row 0
-				PORTB = i2;
-				_delay_us(1);
+					// sel row
+					i2 = i1 << 4;				// to prevent momentary flicker to row 0
+					PORTB = i2;				
+					button_last[i1] = button_current[i1];
 				
-				button_last[i1] = button_current[i1];
-				
-				_delay_us(6);				// wait for voltage fall! due to high resistance pullup
-				PORTE |= (E4_LD);	
-				_delay_us(1);
+					_delay_us(100);				// wait for voltage fall! due to high resistance pullup
+					PORTE |= (E4_LD);	
+					_delay_us(1);
 
-				for(i2=0;i2<8;i2++) {
+					for(i2=0;i2<8;i2++) {
 					
-					// =================================================
-					i3 = i1;
-					i4 = (PINE & E5_SER1)!=0;
+						// =================================================
+						i3 = i1;
+						i4 = (PINE & E5_SER1)!=0;
 					
-					if (!i4) 
-	                    button_current[i3] |= (1 << i2);
-	                else
-	                    button_current[i3] &= ~(1 << i2);
+						if (!i4) 
+		                    button_current[i3] |= (1 << i2);
+		                else
+		                    button_current[i3] &= ~(1 << i2);
 
-					buttonCheck(i3, i2);
+						buttonCheck(i3, i2);
 
-					if (button_event[i3] & (1 << i2)) {
-	                    button_event[i3] &= ~(1 << i2);	
+						if (button_event[i3] & (1 << i2)) {
+		                    button_event[i3] &= ~(1 << i2);	
 	
+							PORTC |= C2_WR;
+							PORTD = i4 << 4;
+							//_delay_us(1);
+							PORTC &= ~(C2_WR);
+
+							PORTC |= C2_WR;
+							PORTD = ((7-i1)<<4) | (7-i2);
+							//_delay_us(1);
+							PORTC &= ~(C2_WR);
+						}
+					
+				
+
+
+						PORTE |= (E3_CLK);
+						_delay_us(1);
+						PORTE &= ~(E3_CLK);
+					
+						_delay_us(1);
+					}
+
+					PORTE &= ~(E4_LD);	
+				}
+			
+
+				// ====================== send tilt val
+			
+				if(tilt_mode) {
+			
+					tilt[tilt_axis][1] = tilt[tilt_axis][0];
+					tilt_accum[tilt_axis] -= tilt_bucket[tilt_axis][tilt_index];
+					t = ADCW >> 2;
+					tilt_bucket[tilt_axis][tilt_index] = t;
+					tilt_accum[tilt_axis] += t;
+					tilt[tilt_axis][0] = tilt_accum[tilt_axis] >> 3;
+			
+					// send tilt,val via usb
+			
+					if(tilt[tilt_axis][0] != tilt[tilt_axis][1]) {			
 						PORTC |= C2_WR;
-						PORTD = i4 << 4;
+						PORTD = 208 + tilt_axis;	// TILT message (13 << 4) plus axis
 						//_delay_us(1);
 						PORTC &= ~(C2_WR);
 
 						PORTC |= C2_WR;
-						PORTD = ((7-i1)<<4) | (7-i2);
+						PORTD = tilt[tilt_axis][0];	// value
 						//_delay_us(1);
 						PORTC &= ~(C2_WR);
 					}
-					
-				
-
-
-					PORTE |= (E3_CLK);
-					_delay_us(1);
-					PORTE &= ~(E3_CLK);
-					
-					_delay_us(1);
-				}
-
-				PORTE &= ~(E4_LD);	
-			}
 			
-
-			// ====================== send tilt val
-			
-			if(tilt_mode) {
-			
-				tilt[tilt_axis][1] = tilt[tilt_axis][0];
-				tilt_accum[tilt_axis] -= tilt_bucket[tilt_axis][tilt_index];
-				t = ADCW >> 2;
-				tilt_bucket[tilt_axis][tilt_index] = t;
-				tilt_accum[tilt_axis] += t;
-				tilt[tilt_axis][0] = tilt_accum[tilt_axis] >> 3;
-			
-				// send tilt,val via usb
-			
-				if(tilt[tilt_axis][0] != tilt[tilt_axis][1]) {			
-					PORTC |= C2_WR;
-					PORTD = 208 + tilt_axis;	// TILT message (13 << 4) plus axis
-					//_delay_us(1);
-					PORTC &= ~(C2_WR);
-
-					PORTC |= C2_WR;
-					PORTD = tilt[tilt_axis][0];	// value
-					//_delay_us(1);
-					PORTC &= ~(C2_WR);
-				}
-			
-				if(tilt_axis==1) {
-					ADMUX = (1<<MUX0);
-					tilt_axis = 0;
-					tilt_index = (tilt_index + 1) % 8;
-				}
-				else {
-					ADMUX = 0;
-					tilt_axis = 1;
-				}
+					if(tilt_axis==1) {
+						ADMUX = (1<<MUX0);
+						tilt_axis = 0;
+						tilt_index = (tilt_index + 1) % 8;
+					}
+					else {
+						ADMUX = 0;
+						tilt_axis = 1;
+					}
 		
 			
-				ADCSRA |= (1<<ADSC);		// start conversion
+					ADCSRA |= (1<<ADSC);		// start conversion
+				}
+			
+				input_check = 0;
+			
 			}
 			
 			// ====================== check usb/sleep status
