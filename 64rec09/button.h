@@ -24,7 +24,7 @@
 
 #include "types.h"
 
-#define kButtonEventQueueSize 32
+#define kButtonEventQueueSize 64
 
 #define kButtonStateDown 1
 #define kButtonStateUp   0
@@ -33,16 +33,16 @@
 #define kButtonUpEvent   0
 
 #define kButtonDownDefaultDebounceCount 1
-#define kButtonUpDefaultDebounceCount 15
+#define kButtonUpDefaultDebounceCount   50
 
 #define kButtonNewEvent   1
 #define kButtonNoEvent    0
 
-extern uint8 button_current[8],             // bitmap of physical button state (depressed or released)
-             button_last[8],                // bitmap of physical button state last time buttons were read
-			button_state[8],              // bitmap of debounced button state
-   			button_debounce_count[8][8],   // debounce counters for each button
-             button_event[8];               // queued button events (kButtonDownEvent or kButtonDownEvent)
+extern uint8 button_current[16],             // bitmap of physical button state (depressed or released)
+             button_last[16],                // bitmap of physical button state last time buttons were read
+			button_state[16],              // bitmap of debounced button state
+   			button_debounce_count[16][16],   // debounce counters for each button
+             button_event[16];               // queued button events (kButtonDownEvent or kButtonDownEvent)
 
 void buttonInit(void);
 void buttonCheck(uint8 row, uint8 index);
