@@ -1,0 +1,131 @@
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svn/!svn/ver/10/trunk/optiboot/bootloaders/optiboot
+END
+optiboot.c
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot.c
+END
+optiboot_pro_20mhz.hex
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_pro_20mhz.hex
+END
+optiboot_diecimila.hex
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_diecimila.hex
+END
+optiboot_atmega328_pro_8MHz.hex
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_atmega328_pro_8MHz.hex
+END
+optiboot_ng.lst
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/!svn/ver/12/trunk/optiboot/bootloaders/optiboot/optiboot_ng.lst
+END
+optiboot_pro_8MHz.lst
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_pro_8MHz.lst
+END
+optiboot_pro_16MHz.hex
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_pro_16MHz.hex
+END
+optiboot_lilypad_resonator.hex
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/!svn/ver/12/trunk/optiboot/bootloaders/optiboot/optiboot_lilypad_resonator.hex
+END
+optiboot_atmega328.hex
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_atmega328.hex
+END
+optiboot_pro_20mhz.lst
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_pro_20mhz.lst
+END
+optiboot_lilypad.hex
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/!svn/ver/12/trunk/optiboot/bootloaders/optiboot/optiboot_lilypad.hex
+END
+optiboot_diecimila.lst
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_diecimila.lst
+END
+optiboot_atmega328_pro_8MHz.lst
+K 25
+svn:wc:ra_dav:version-url
+V 84
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_atmega328_pro_8MHz.lst
+END
+optiboot_pro_16MHz.lst
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_pro_16MHz.lst
+END
+optiboot_ng.hex
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/!svn/ver/12/trunk/optiboot/bootloaders/optiboot/optiboot_ng.hex
+END
+makeall
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/makeall
+END
+optiboot_pro_8MHz.hex
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/!svn/ver/12/trunk/optiboot/bootloaders/optiboot/optiboot_pro_8MHz.hex
+END
+optiboot_lilypad_resonator.lst
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_lilypad_resonator.lst
+END
+optiboot_atmega328.lst
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_atmega328.lst
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/Makefile
+END
+optiboot_lilypad.lst
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/!svn/ver/13/trunk/optiboot/bootloaders/optiboot/optiboot_lilypad.lst
+END

@@ -1,0 +1,361 @@
+// grid op
+
+#define F_CPU 20000000UL
+
+#include <inttypes.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <util/delay.h>
+#include <stdlib.h>
+#include "twi.h"
+#include "button.h"
+
+// i2c addr, can be overwritten by makefile
+#ifndef ADDR
+#define ADDR 100
+#endif
+
+// pins
+
+#define C0_KROW_A 0x01
+#define C1_KROW_B 0x02
+#define C2_KROW_C 0x04
+
+#define B0_KCOL_Q 0x01
+#define B1_KCOL_CLK 0x02
+#define B2_KCOL_SH 0x04
+
+#define B3_LROW_SER 0x08
+#define B4_LROW_SCK 0x10
+#define B5_LROW_RCK 0x20
+
+
+// tuning
+#define LED_REFRESH_RATE 20
+#define KEYPAD_REFRESH_RATE 10
+#define INPUT_BUFFER_LENGTH 256
+
+
+// i2c output state
+#define _REPLY_QUERY 0
+#define _REPLY_KEYPAD 1
+
+
+
+// i2c protocol
+// input
+#define _SLEEP 254
+#define _WAKE 255
+#define _QUERY 0
+
+#define _LED_SET0 0x10
+#define _LED_SET1 0x11
+#define _LED_ALL0 0x12
+#define _LED_ALL1 0x13
+#define _LED_MAP 0x14
+#define _LED_ROW 0x15
+#define _LED_COL 0x16
+#define _LED_INT 0x17
+#define _LED_DIM_SET0 0x18
+#define _LED_DIM_SET1 0x19
+#define _LED_DIM_ALL0 0x1A
+#define _LED_DIM_ALL1 0x1B
+#define _LED_DIM_MAP 0x1C
+#define _LED_DIM_ROW 0x1D
+#define _LED_DIM_COL 0x1E
+#define _LED_DIM_INT 0x1F
+
+#define _KEYPAD_REQUEST 0x20
+
+
+const uint8_t i2c_packet_length[32] = {
+	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+	2,2,1,1,9,3,3,2,2,2,1,1,9,3,3,2
+};
+
+
+
+// globals
+uint8_t i1, i2, i3, i4;
+uint8_t n1, n2, n3, n4;
+volatile uint8_t rx[INPUT_BUFFER_LENGTH];
+volatile uint8_t rx_read, rx_write;
+volatile uint8_t bus_address;
+volatile uint8_t input_new;
+volatile uint8_t reply_type;
+
+volatile uint8_t refresh_row;
+volatile uint8_t k_row;
+volatile uint8_t refresh_cycle;
+volatile uint8_t dim_intensity;
+
+volatile uint8_t scan_keypad;
+
+uint8_t key_changes[256], key_send[1];
+volatile uint8_t key_read, key_write;
+
+volatile uint8_t lights[8] = {1,2,3,4,5,6,7,8};
+volatile uint8_t dim[8] = {3,3,0,0,255,255,252,252};
+
+//uint8_t intensity[16] = {0,1,2,3,4,5,6,7,8,10,12,14,17,21,26,32};
+
+
+
+// trigger a keypad scan
+ISR(TIMER1_COMPA_vect)
+{
+	scan_keypad++;
+
+	TCNT1 = 0;
+}
+
+// cycle led row refresh
+ISR(TIMER0_COMPA_vect)
+{
+	if(refresh_row > 7) {
+		refresh_row = 0;
+		PORTB |= B3_LROW_SER;
+		PORTB |= B4_LROW_SCK;
+		PORTB &= ~B4_LROW_SCK;
+		OCR0B = dim_intensity + 1;
+	}
+	else {
+		PORTB &= ~B3_LROW_SER;
+		PORTB |= B4_LROW_SCK;
+		PORTB &= ~B4_LROW_SCK;
+	}
+
+	PORTD = 0;
+	PORTB |= B5_LROW_RCK;
+	PORTB &= ~B5_LROW_RCK;
+	PORTD = lights[7-refresh_row];
+
+	refresh_row++;
+
+
+	TCNT0 = 0;
+}
+
+ISR(TIMER0_COMPB_vect)
+{
+	PORTD = lights[8-refresh_row] & ~dim[8-refresh_row];
+}
+
+
+
+// BUS RECEIVE
+// ===============================================================
+// ===============================================================
+void processRx(uint8_t *data, int index)
+{
+	for(n1=0; n1 < index; n1++) {
+		rx[(n1 + rx_write)%255] = data[n1];
+	}
+	rx_write += index;
+}
+
+// BUS TRANSMIT
+// ===============================================================
+// ===============================================================
+void processTx(void)
+{
+	if(key_read != key_write) {
+		key_send[0] = key_changes[key_read];
+		key_read++;
+	}
+	else key_send[0] = 255;
+
+	twi_transmit(key_send, 1);
+}
+
+
+// main
+// ===============================================================
+// ===============================================================
+// ===============================================================
+// ===============================================================
+int main(void)
+{
+	uint8_t rx_type;
+
+	input_new = 0;
+	refresh_row = 0;
+	scan_keypad = 0;
+	key_read = key_write = 0;
+	rx_read = rx_write = 0;
+	dim_intensity = 2;
+
+	reply_type = _REPLY_KEYPAD;
+
+	DDRB = 0xfe;	// input pin 1, outputs else
+	DDRC = 0xff;	// output
+	DDRD = 0xff;	// output
+
+	bus_address = ADDR;	// initialized value, default 100 or from makefile
+						// we will overwrite this with the value stored in eeprom
+
+	// led refresh interrupt
+	TCCR0A = 0;
+	TCCR0B = (1<<CS02) | (1<<CS00);
+	TIMSK0 = (1 << OCIE0A) | (1 << OCIE0B);
+	OCR0A = LED_REFRESH_RATE;
+	OCR0B = dim_intensity;
+
+	// keypad interrupt
+	TCCR1A = 0;
+	TCCR1B = (1<<CS12) | (1<<CS10);
+	//TIMSK1 = (1<<OCIE1A);
+	OCR1A = KEYPAD_REFRESH_RATE;
+
+	buttonInit();
+
+	sei();
+
+	twi_init();
+	twi_setAddress(bus_address);
+	twi_attachSlaveRxEvent(processRx);
+	twi_attachSlaveTxEvent(processTx);
+
+
+	// loop
+	// ===============================================================
+	// ===============================================================
+	while(1) {
+		if(scan_keypad) {
+			//for(k_row=0;k_row<8;k_row++) {
+				button_last[k_row] = button_current[k_row];
+				//_delay_us(5);
+				PORTB |= B2_KCOL_SH;
+				_delay_us(5);
+
+				for(i1=0;i1<8;i1++) {
+					i2 = !(PINB & B0_KCOL_Q);
+					PORTB |= B1_KCOL_CLK;
+					//_delay_us(2);
+					PORTB &= ~B1_KCOL_CLK;
+					if (i2)
+			            button_current[k_row] |= (1 << i1);
+			        else
+			            button_current[k_row] &= ~(1 << i1);
+					buttonCheck(k_row,i1);
+					if(button_event[k_row] & (1<<i1)) {
+						button_event[k_row] &= ~(1<<i1);
+						key_changes[key_write]= ((!i2)<<7) + ((7-i1)*8) + (k_row);
+						key_write++;
+					}
+				}
+
+			PORTB &= ~B2_KCOL_SH;
+			
+			k_row++;
+			k_row %= 8;
+			PORTC = k_row;//(PINC | 0x07) | k_row;
+
+			scan_keypad = 0;
+		}
+
+		if(rx_read != rx_write) {
+			rx_type = rx[rx_read];
+			//rx_type = rx[0];
+			if(rx_type == _SLEEP) {
+				TIMSK0 = 0;
+				TIMSK1 = 0;
+				PORTD = 0;
+			} else if(rx_type == _WAKE) {
+				TIMSK0 = (1 << OCIE0A) | (1 << OCIE0B);
+				TIMSK1 = (1<<OCIE1A);
+			} else if(rx_type == _KEYPAD_REQUEST) {
+				reply_type = _REPLY_KEYPAD;
+			} else if(rx_type == _LED_SET0) {
+				// _LED_SET0 //////////////////////////////////////////////
+				i3 = rx[rx_read + 1];
+				i1 = i3 & 0x0f;
+				i2 = i3 >> 4;
+				lights[i1] &= ~(1<<i2);
+			} else if(rx_type == _LED_SET1) {
+				// _LED_SET1 //////////////////////////////////////////////
+				i3 = rx[rx_read + 1];
+				i1 = i3 & 0x0f;
+				i2 = i3 >> 4;
+				lights[i1] |= (1<<i2);
+			} else if(rx_type == _LED_ALL0) {
+				// _LED_ALL0 //////////////////////////////////////////////
+				for(i1=0;i1<8;i1++) lights[i1] = 0;
+			} else if(rx_type == _LED_ALL1) {
+				// _LED_ALL1 //////////////////////////////////////////////
+				for(i1=0;i1<8;i1++) lights[i1] = 255;
+			} else if(rx_type == _LED_MAP) {
+				// _LED_MAP ///////////////////////////////////////////////
+				for(i1=0;i1<8;i1++) {
+					lights[i1] = rx[1 + rx_read + i1];
+				}
+			} else if(rx_type == _LED_ROW) {
+				// _LED_ROW ///////////////////////////////////////////////
+				lights[rx[rx_read + 1]] = rx[rx_read + 2];
+			} else if(rx_type == _LED_COL) {
+				// _LED_COL ///////////////////////////////////////////////
+				i1 = rx[rx_read + 1];
+				i2 = rx[rx_read + 2];
+				for(i3=0;i3<8;i3++) {
+					if(i2 & (1<<i3)) lights[i3] |= (1<<i1);
+					else lights[i3] &= ~(1<<i1);
+				}
+			} else if(rx_type == _LED_INT) {
+				// _LED_INT ///////////////////////////////////////////////
+
+			} else if(rx_type == _LED_DIM_SET0) {
+				// _LED_DIM_SET0 //////////////////////////////////////////
+				i3 = rx[rx_read + 1];
+				i1 = i3 & 0x0f;
+				i2 = i3 >> 4;
+				dim[i1] &= ~(1<<i2);
+			} else if(rx_type == _LED_DIM_SET1) {
+				// _LED_DIM_SET1 //////////////////////////////////////////
+				i3 = rx[rx_read + 1];
+				i1 = i3 & 0x0f;
+				i2 = i3 >> 4;
+				dim[i1] |= (1<<i2);
+			} else if(rx_type == _LED_DIM_ALL0) {
+				// _LED_DIM_ALL0 //////////////////////////////////////////
+				for(i1=0;i1<8;i1++) dim[i1] = 0;
+			} else if(rx_type == _LED_DIM_ALL1) {
+				// _LED_DIM_ALL1 //////////////////////////////////////////
+				for(i1=0;i1<8;i1++) dim[i1] = 255;
+			} else if(rx_type == _LED_DIM_MAP) {
+				// _LED_DIM_MAP ///////////////////////////////////////////
+				for(i1=0;i1<8;i1++) {
+					dim[i1] = rx[1 + rx_read + i1];
+				}
+			} else if(rx_type == _LED_DIM_ROW) {
+				// _LED_DIM_ROW ///////////////////////////////////////////
+				dim[rx[rx_read + 1]] = rx[rx_read + 2];
+			} else if(rx_type == _LED_DIM_COL) {
+				// _LED_DIM_COL ///////////////////////////////////////////
+				i1 = rx[rx_read + 1];
+				i2 = rx[rx_read + 2];
+				for(i3=0;i3<8;i3++) {
+					if(i2 & (1<<i3)) dim[i3] |= (1<<i1);
+					else dim[i3] &= ~(1<<i1);
+				}
+			} else if(rx_type == _LED_DIM_INT) {
+				// _LED_DIM_INT ///////////////////////////////////////////
+				dim_intensity = rx[rx_read + 1];
+			}
+
+			rx_read += i2c_packet_length[rx_type];
+
+			//if(rx_read == rx_write) input_new = 0;
+
+
+			// if(rx_type == _FILL) {
+			// 				for(i1 = 0; i1 < 64; i1++)
+			// 					lights[i1] = rx[1] % 16;
+			// 			}
+			// 			else if(rx_type == _SET){
+			// 				lights[rx[1]%64] = intensity[rx[2]%16];
+			// 			}
+		}
+	}
+
+	return 0;
+}
